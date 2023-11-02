@@ -1,0 +1,7 @@
+{
+  "name": "soldier-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}
