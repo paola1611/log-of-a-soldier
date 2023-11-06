@@ -13,34 +13,60 @@ export class InicioPage implements OnInit {
     titulo: '',
     fecha: '',
     descripcion: '',
-    fotoURL: '', // URL de la foto en Firebase Storage
+    fotoURL: '', // Cambiando el tipo a string
     audioURL: '', // URL del audio en Firebase Storage
   };
+  imageUrl: File | null = null; // Variable para almacenar el archivo de imagen
 
   constructor(private firestore: AngularFirestore, private storage: AngularFireStorage) { }
 
-  registrarVivencia() {
-    // Agrega la vivencia a Firestore
-    this.firestore.collection('vivencias').add(this.vivencia).then(() => {
-      console.log('Vivencia registrada correctamente');
-    }).catch(error => {
-      console.error('Error al registrar la vivencia:', error);
-    });
+  async registrarVivencia() {
+    if (this.imageUrl) {
+      // Obtén la URL de la imagen antes de agregar la vivencia a Firestore
+      try {
+        this.vivencia.fotoURL = await this.uploadImageAndGetURL();
+        
+        // Agrega la vivencia a Firestore
+        this.firestore.collection('vivencias').add(this.vivencia).then(() => {
+          console.log('Vivencia registrada correctamente');
+          // Reinicia el objeto vivencia para futuros registros
+          this.vivencia = {
+            titulo: '',
+            fecha: '',
+            descripcion: '',
+            fotoURL: '',
+            audioURL: '',
+          };
+          // También reinicia la variable imageUrl
+          this.imageUrl = null;
+        }).catch(error => {
+          console.error('Error al registrar la vivencia:', error);
+        });
+      } catch (error) {
+        console.error('Error al obtener la URL de la imagen:', error);
+      }
+    } else {
+      console.error('Por favor, selecciona una imagen.');
+    }
+  }
+
+  async uploadImageAndGetURL() {
+    if (this.imageUrl) {
+      // Genera un nombre único para la foto
+      const fotoPath = `fotos/${new Date().getTime()}_${this.imageUrl.name}`;
+      
+      // Sube la foto a Firebase Storage
+      const snapshot = await this.storage.upload(fotoPath, this.imageUrl);
+
+      // Obtén la URL de descarga de la foto y devuelve la URL
+      return this.storage.ref(fotoPath).getDownloadURL().toPromise();
+    } else {
+      throw new Error('No se proporcionó una imagen para cargar.');
+    }
   }
 
   cargarFoto(event: any) {
-    const fotoFile = event.target.files[0];
-    
-    // Genera un nombre único para la foto
-    const fotoPath = `fotos/${new Date().getTime()}_${fotoFile.name}`;
-    
-    // Sube la foto a Firebase Storage
-    this.storage.upload(fotoPath, fotoFile).then(snapshot => {
-      // Obtén la URL de descarga de la foto y guárdala en el objeto de vivencia
-      this.storage.ref(fotoPath).getDownloadURL().subscribe(url => {
-        this.vivencia.fotoURL = url;
-      });
-    });
+    this.imageUrl = event.target.files[0];
   }
 
   cargarAudio(event: any) {
@@ -52,7 +78,7 @@ export class InicioPage implements OnInit {
     // Sube el audio a Firebase Storage
     this.storage.upload(audioPath, audioFile).then(snapshot => {
       // Obtén la URL de descarga del audio y guárdala en el objeto de vivencia
-      this.storage.ref(audioPath).getDownloadURL().subscribe(url => {
+      snapshot.ref.getDownloadURL().then(url => {
         this.vivencia.audioURL = url;
       });
     });
@@ -60,5 +86,4 @@ export class InicioPage implements OnInit {
 
   ngOnInit() {
   }
-
 }
